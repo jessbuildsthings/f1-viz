@@ -23,7 +23,7 @@ with open('data/drop_down_data.pickle', 'rb') as handle:
     DROP_DOWN_DATA = pickle.load(handle)
 DEFAULT_YEAR = list(DROP_DOWN_DATA.keys())[0]
 DEFAULT_GPS = sorted(list(DROP_DOWN_DATA[DEFAULT_YEAR].keys()))
-DEFAULT_GP = 'Australian'
+DEFAULT_GP = 'Azerbaijan'
 TEL_PARAMS = ['Gear', 'Speed', 'Brake', 'Throttle']
 
 # App layout
@@ -70,7 +70,7 @@ app.layout = dbc.Container(
                             dbc.Tab(label="Info", tab_id='welcome-tab')
                         ],
                         id='tabs',
-                        active_tab='race-tab'
+                        active_tab='tel-tab'
                     )
                 )
             ]
