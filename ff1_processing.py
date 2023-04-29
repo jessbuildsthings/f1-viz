@@ -22,12 +22,12 @@ def downcast_df(df):
     return df
 
 
-def get_lap_data(season, gp, session, cache_path=None, save_path=None):
+def get_lap_data(season, gp, session_in, cache_path=None, save_path=None):
     """
     Loads lap data using FastF1. If specified, pickles and saves the data to the specified path.
     :param int season: Season
     :param str gp: Name of the gp, e.g. 'Australian' or 'Bahrain'
-    :param str session: Session ('Race' or 'Qualifying')
+    :param str session_in: Session ('Race' or 'Qualifying')
     :param str cache_path: If caching FastF1 API call data (recommended), path to cache. None = do not use cache.
     :param str save_path: Path to save pickled lap data dataframe (optional).
     :return: DataFrame with processed lap data for the season, grand prix, and session specified by user.
@@ -38,7 +38,7 @@ def get_lap_data(season, gp, session, cache_path=None, save_path=None):
         ff1.Cache.enable_cache(cache_path)
 
     # Load the session data
-    session = ff1.get_session(season, gp, session)
+    session = ff1.get_session(season, gp, session_in)
     session.load()
 
     # Get laps data (excl. formation lap)
@@ -46,7 +46,13 @@ def get_lap_data(season, gp, session, cache_path=None, save_path=None):
     laps = laps.loc[laps['LapNumber'] >= 1]
 
     # Add final driver position to laps data (for future processing convenience)
-    results = pd.DataFrame({'DriverNumber': session.results.DriverNumber, 'Position': session.results.Position})
+    if session_in == 'Sprint':
+        results = laps.sort_values(by='LapNumber', ascending=False).drop_duplicates(['DriverNumber'])
+        results.sort_values(by=['LapNumber', 'Time'], ascending=[False, True], inplace=True, ignore_index=True)
+        results['Position'] = results.index+1
+        results = results[['DriverNumber', 'Position']]
+    else:
+        results = pd.DataFrame({'DriverNumber': session.results.DriverNumber, 'Position': session.results.Position})
     laps = laps.merge(results, how='left', on='DriverNumber')
 
     # Get winner's delta to each driver
@@ -174,7 +180,7 @@ def add_session_to_site_data(season, gp, session, path_to_data, cache_path=None,
     else:
         drop_down_data = {}
 
-        # Add (or overwrite) lap and telemetry data for the requested gp and session
+    # Add (or overwrite) lap and telemetry data for the requested gp and session
     laps = get_lap_data(season, gp, session, cache_path=cache_path)
     gp_data['lap_data'][session] = laps
 

@@ -65,8 +65,8 @@ app.layout = dbc.Container(
                 dbc.Col(
                     dbc.Tabs(
                         [
-                            dbc.Tab(label="Telemetry (Race and Quali)", tab_id='tel-tab'),
-                            dbc.Tab(label="Lap View (Race Only)", tab_id='race-tab'),
+                            dbc.Tab(label="Telemetry (All Sessions)", tab_id='tel-tab'),
+                            dbc.Tab(label="Lap View (Race & Sprint Only)", tab_id='race-tab'),
                             dbc.Tab(label="Info", tab_id='welcome-tab')
                         ],
                         id='tabs',
@@ -103,10 +103,16 @@ def build_welcome_tab():
     )
 
 
-def build_race_tab(year, laps):
-    """Builds the tab that shows race summaries (delta, tyre strategy, lap times)."""
+def build_lap_tab(year, grand_prix):
+    """Builds the tab that shows lap summaries (delta, tyre strategy, lap times)."""
 
-    delta_fig = plots.get_delta_viz(year, laps)
+    # Get options and default values for dropdowns; exclude quali data if it exists
+    sessions = list(DROP_DOWN_DATA[year][grand_prix].keys())
+    if 'Qualifying' in sessions:
+        sessions.remove('Qualifying')
+    session = sessions[0]
+
+    # delta_fig = plots.get_delta_viz(year, laps)
     delta_footer = """
         Use this visualization to see the delta between drivers and the winner over the race. 
         To add or remove a driver from the graph, tap/click their name in the legend once. To isolate a driver, 
@@ -115,13 +121,13 @@ def build_race_tab(year, laps):
         yellow flag, red = red flag, and white = (virtual) safety car.
     """
 
-    tyre_fig = plots.get_tyre_strategy_viz(laps)
+    # tyre_fig = plots.get_tyre_strategy_viz(laps)
     tyre_footer = """
         Use this visualization to see overall tyre strategy for the race
         (white = hard, yellow = medium, red = soft).
     """
 
-    lap_time_fig = plots.get_lap_time_heatmap(laps)
+    # lap_time_fig = plots.get_lap_time_heatmap(laps)
     lap_time_footer = """
         Use this visualization to get a bird's eye view of lap times over the race as a whole. 
         Hover to see a driver's lap time for a specific lap.
@@ -136,7 +142,29 @@ def build_race_tab(year, laps):
     content = [
         dbc.Row(
             dbc.Col(
-                dcc.Graph(id='tyre-strategy-viz', figure=delta_fig)
+                [
+                    html.P("Select session:"),
+                    dcc.Dropdown(
+                        id='lap-tab-session',
+                        multi=False,
+                        value=session,
+                        options=[{'label': x, 'value': x} for x in sessions],
+                        clearable=False
+                    ),
+                ],
+                xs=6, sm=12, md=12, lg=6, xl=6
+            ),
+        ),
+        html.Br(),
+        dbc.Row(
+            dbc.Col(
+                [
+                    dcc.Loading(
+                        children=[dcc.Graph(id='delta-viz', figure=plots.get_blank_fig())],
+                        type='circle'
+                    )
+                ],
+                width=12
             )
         ),
         dbc.Row(
@@ -147,7 +175,13 @@ def build_race_tab(year, laps):
         html.Br(),
         dbc.Row(
             dbc.Col(
-                dcc.Graph(id='tyre-strategy-viz', figure=tyre_fig)
+                [
+                    dcc.Loading(
+                        children=[dcc.Graph(id='tyre-strategy-viz', figure=plots.get_blank_fig())],
+                        type='circle'
+                    )
+                ],
+                width=12
             )
         ),
         dbc.Row(
@@ -158,7 +192,13 @@ def build_race_tab(year, laps):
         html.Br(),
         dbc.Row(
             dbc.Col(
-                dcc.Graph(id='tyre-strategy-viz', figure=lap_time_fig)
+                [
+                    dcc.Loading(
+                        children=[dcc.Graph(id='lap-time-viz', figure=plots.get_blank_fig())],
+                        type='circle'
+                    )
+                ],
+                width=12
             )
         ),
         dbc.Row(
@@ -396,8 +436,8 @@ def render_tab_content(active_tab, laps, year, grand_prix):
             if grand_prix in DROP_DOWN_DATA[year].keys():
                 if active_tab == 'tel-tab':
                     content = build_tel_tab(year, grand_prix)
-                elif ('Race' in laps.keys()) and (active_tab == 'race-tab'):
-                    content = build_race_tab(year, laps['Race'])
+                elif (('Race' in laps.keys()) or ('Sprint' in laps.keys())) and (active_tab == 'race-tab'):
+                    content = build_lap_tab(year, grand_prix)
 
     return content
 
@@ -580,6 +620,26 @@ def render_tel_line_graph(lap_1, lap_2, click_data_1, click_data_2, year, sessio
 
     return fig
 
+
+@app.callback(
+    Output('delta-viz', 'figure'),
+    Output('tyre-strategy-viz', 'figure'),
+    Output('lap-time-viz', 'figure'),
+    Input('lap-tab-session', 'value'),
+    State('year', 'value'),
+    State('lap-data', 'data')
+)
+def render_lap_tab(session, year, laps):
+    """
+    Renders visualizations for lap tab.
+    """
+
+    laps_session = laps[session]
+    delta_fig = plots.get_delta_viz(year, laps_session)
+    tyre_fig = plots.get_tyre_strategy_viz(laps_session)
+    lap_time_fig = plots.get_lap_time_heatmap(laps_session)
+
+    return delta_fig, tyre_fig, lap_time_fig
 
 if __name__ == "__main__":
     app.run_server(debug=True)
